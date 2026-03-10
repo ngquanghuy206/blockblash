@@ -318,6 +318,58 @@ html,body { width:100%; height:100%; font-family:Arial,sans-serif; overflow:hidd
 }
 .play-btn:active { transform:translateY(5px); box-shadow:0 1px 0 #a06000,0 4px 10px rgba(0,0,0,.3); }
 
+/* ADMIN BUTTON */
+.admin-btn {
+  background:transparent; border:1.5px solid rgba(255,255,255,0.2); border-radius:30px;
+  padding:8px 22px; font-size:13px; font-weight:700; color:rgba(255,255,255,0.4);
+  cursor:pointer; margin-top:16px; letter-spacing:1px;
+  transition:all .2s;
+}
+.admin-btn:hover { border-color:rgba(255,255,255,0.5); color:rgba(255,255,255,0.7); }
+
+/* ADMIN MODAL */
+#admin-modal {
+  position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.75);
+  display:none; align-items:center; justify-content:center;
+}
+#admin-modal.open { display:flex; }
+#admin-box {
+  background:linear-gradient(160deg,#2a1f6e,#1a1450);
+  border-radius:20px; padding:32px 28px; width:min(320px,85vw);
+  box-shadow:0 20px 60px rgba(0,0,0,0.6);
+  border:1px solid rgba(255,255,255,0.12);
+  display:flex; flex-direction:column; align-items:center; gap:14px;
+  animation:bumpIn .3s cubic-bezier(.34,1.56,.64,1);
+}
+#admin-box h3 { font-size:20px; font-weight:900; color:#fff; letter-spacing:1px; }
+#admin-box p { font-size:13px; color:rgba(255,255,255,0.5); text-align:center; }
+#admin-key-input {
+  width:100%; padding:13px 16px; border-radius:12px; border:2px solid rgba(255,255,255,0.15);
+  background:rgba(255,255,255,0.07); color:#fff; font-size:16px; font-weight:700;
+  text-align:center; letter-spacing:3px; outline:none;
+}
+#admin-key-input:focus { border-color:rgba(245,197,24,0.6); }
+#admin-key-input.error { border-color:rgba(255,80,80,0.7); animation:shake .35s ease; }
+#admin-submit-btn {
+  width:100%; padding:13px; border:none; border-radius:12px;
+  background:linear-gradient(135deg,#f5c518,#d49000); color:#fff;
+  font-size:16px; font-weight:900; cursor:pointer;
+  box-shadow:0 4px 0 #a06000;
+  transition:all .13s;
+}
+#admin-submit-btn:active { transform:translateY(3px); box-shadow:0 1px 0 #a06000; }
+#admin-cancel-btn {
+  background:transparent; border:none; color:rgba(255,255,255,0.4);
+  font-size:13px; cursor:pointer; padding:4px;
+}
+#admin-badge {
+  position:fixed; top:14px; left:50%; transform:translateX(-50%);
+  background:linear-gradient(135deg,#f5c518,#d49000);
+  color:#000; font-size:12px; font-weight:900; padding:5px 14px;
+  border-radius:20px; z-index:400; display:none; letter-spacing:1px;
+  box-shadow:0 4px 12px rgba(245,197,24,0.5);
+}
+
 /* ===== SHOP OVERLAY ===== */
 #shop-overlay {
   position:fixed; inset:0; z-index:600;
@@ -434,7 +486,23 @@ html,body { width:100%; height:100%; font-family:Arial,sans-serif; overflow:hidd
   <h1>Block Blast!</h1>
   <p>Kéo &amp; thả khối vào lưới<br>Điền đầy hàng hoặc cột để xóa điểm!</p>
   <button class="play-btn" onclick="startGame()">▶ Bắt đầu</button>
+  <button class="admin-btn" onclick="openAdminModal()">🔒 Chế độ Admin</button>
 </div>
+
+<!-- ADMIN MODAL -->
+<div id="admin-modal">
+  <div id="admin-box">
+    <div style="font-size:36px">🛡️</div>
+    <h3>ADMIN MODE</h3>
+    <p>Nhập key để mở khóa toàn bộ skin</p>
+    <input id="admin-key-input" type="password" placeholder="Nhập key..." maxlength="20" onkeydown="if(event.key==='Enter')submitAdminKey()"/>
+    <button id="admin-submit-btn" onclick="submitAdminKey()">🔓 Xác Nhận</button>
+    <button id="admin-cancel-btn" onclick="closeAdminModal()">Huỷ</button>
+  </div>
+</div>
+
+<!-- ADMIN BADGE -->
+<div id="admin-badge">⚡ ADMIN MODE</div>
 
 <!-- GAME OVER -->
 <div class="overlay" id="ov-over">
@@ -865,7 +933,7 @@ function tryPlace(idx,sr,sc){
     applyBlockStyle(el,equippedBlk,cellColor);
     setTimeout(()=>el.classList.remove('pop-in'),240);
   });
-  score+=piece.cells.length;piecesPlaced++;
+  score+=piece.cells.length*10;piecesPlaced++;
   pieces[idx]=null;sfxPlace();
   setTimeout(checkLines,115);
 }
@@ -880,8 +948,8 @@ function checkLines(){
   const tot=fr.length+fc.length;
   if(tot>0){
     combo++;
-    const mul=Math.max(1,combo);
-    const pts=tot*10*COLS*mul;
+    // Score: 10 pts per cell cleared (each row = COLS cells, each col = ROWS cells)
+    const pts=(fr.length*COLS + fc.length*ROWS)*10;
     score+=pts;linesClr+=tot;
 
     // COINS: 100 xu per line cleared
@@ -1100,6 +1168,44 @@ function gameOver(){
   document.getElementById('ov-banner').textContent=isNew?'NEW BEST':'ĐIỂM CỦA BẠN';
   document.getElementById('ov-score').textContent=score.toLocaleString();
   document.getElementById('ov-over').style.display='flex';
+}
+
+// ============================================================
+// ADMIN MODE
+// ============================================================
+const ADMIN_KEY = 'dzixmode';
+let adminMode = false;
+
+function openAdminModal(){
+  document.getElementById('admin-modal').classList.add('open');
+  document.getElementById('admin-key-input').value='';
+  document.getElementById('admin-key-input').classList.remove('error');
+  setTimeout(()=>document.getElementById('admin-key-input').focus(),100);
+}
+
+function closeAdminModal(){
+  document.getElementById('admin-modal').classList.remove('open');
+}
+
+function submitAdminKey(){
+  const val = document.getElementById('admin-key-input').value.trim().toLowerCase();
+  if(val === ADMIN_KEY){
+    adminMode = true;
+    // Unlock all skins
+    ownedBgs  = BG_SKINS.map(s=>s.id);
+    ownedBlks = BLOCK_SKINS.map(s=>s.id);
+    saveData();
+    closeAdminModal();
+    document.getElementById('admin-badge').style.display='block';
+    showToast('⚡ Admin Mode! Đã mở khoá tất cả skin!');
+    startGame();
+  } else {
+    const inp = document.getElementById('admin-key-input');
+    inp.classList.add('error');
+    inp.value='';
+    setTimeout(()=>inp.classList.remove('error'),500);
+    showToast('❌ Sai key!');
+  }
 }
 
 // INIT
